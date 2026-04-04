@@ -1,1 +1,1 @@
-web: python persistence_server.py
+worker: python continuous_claude.py
