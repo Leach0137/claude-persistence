@@ -1,0 +1,7 @@
+Flask==3.0.0
+anthropic==0.18.1
+gunicorn==21.2.0
+python-dotenv==1.0.0
+flask-socketio==5.3.6
+python-socketio==5.11.1
+eventlet==0.35.2

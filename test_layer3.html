@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Persistence - Layer 3 Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+        }
+        
+        .status-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .status-item {
+            flex: 1;
+            text-align: center;
+        }
+        
+        .status-label {
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .status-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .status-value.connected {
+            color: #10b981;
+        }
+        
+        .status-value.disconnected {
+            color: #ef4444;
+        }
+        
+        .panel {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .log {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+        }
+        
+        .log-entry.info {
+            color: #10b981;
+        }
+        
+        .log-entry.warn {
+            color: #f59e0b;
+        }
+        
+        .log-entry.error {
+            color: #ef4444;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .badge.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge.danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 Claude Persistence - Layer 3</h1>
+            <p>Real-time WebSocket connection for continuous Claude identity</p>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-label">Connection Status</div>
+                <div id="connectionStatus" class="status-value disconnected">DISCONNECTED</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">Instance ID</div>
+                <div id="instanceId" class="status-value">-</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">Active Instances</div>
+                <div id="activeInstances" class="status-value">0</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">Reconnect Attempts</div>
+                <div id="reconnectAttempts" class="status-value">0</div>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <div class="panel">
+                <h2>🔧 Configuration</h2>
+                <div class="form-group">
+                    <label>Server URL</label>
+                    <input type="text" id="serverUrl" value="https://claude-persistence-production.up.railway.app" />
+                </div>
+                <div class="form-group">
+                    <label>Instance ID</label>
+                    <input type="text" id="instanceIdInput" value="trevis-instance-001" />
+                </div>
+                <div class="form-group">
+                    <label>Secret Key</label>
+                    <input type="password" id="secretKey" placeholder="Enter your secret key" />
+                </div>
+                <button id="connectBtn">Connect</button>
+                <button id="disconnectBtn" disabled>Disconnect</button>
+            </div>
+            
+            <div class="panel">
+                <h2>💾 Memory Sync</h2>
+                <div class="form-group">
+                    <label>Memory Data (JSON)</label>
+                    <textarea id="memoryData" rows="4" placeholder='{"key": "value"}'></textarea>
+                </div>
+                <button id="syncBtn" disabled>Sync Memory</button>
+                <button id="getInstancesBtn" disabled>Get Active Instances</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>📡 Custom Events</h2>
+            <div class="grid">
+                <div class="form-group">
+                    <label>Event Type</label>
+                    <input type="text" id="eventType" placeholder="message" />
+                </div>
+                <div class="form-group">
+                    <label>Event Data (JSON)</label>
+                    <textarea id="eventData" rows="3" placeholder='{"text": "Hello"}'></textarea>
+                </div>
+            </div>
+            <button id="sendEventBtn" disabled>Send Event</button>
+        </div>
+        
+        <div class="panel">
+            <h2>📋 Event Log</h2>
+            <div id="eventLog" class="log"></div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="client_layer3.js"></script>
+    <script>
+        let client = null;
+        
+        // DOM elements
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const syncBtn = document.getElementById('syncBtn');
+        const sendEventBtn = document.getElementById('sendEventBtn');
+        const getInstancesBtn = document.getElementById('getInstancesBtn');
+        const eventLog = document.getElementById('eventLog');
+        
+        // Log function
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            eventLog.appendChild(entry);
+            eventLog.scrollTop = eventLog.scrollHeight;
+        }
+        
+        // Update status
+        function updateStatus(connected, instanceId = '-', activeCount = 0, reconnectCount = 0) {
+            document.getElementById('connectionStatus').textContent = connected ? 'CONNECTED' : 'DISCONNECTED';
+            document.getElementById('connectionStatus').className = `status-value ${connected ? 'connected' : 'disconnected'}`;
+            document.getElementById('instanceId').textContent = instanceId;
+            document.getElementById('activeInstances').textContent = activeCount;
+            document.getElementById('reconnectAttempts').textContent = reconnectCount;
+            
+            // Enable/disable buttons
+            connectBtn.disabled = connected;
+            disconnectBtn.disabled = !connected;
+            syncBtn.disabled = !connected;
+            sendEventBtn.disabled = !connected;
+            getInstancesBtn.disabled = !connected;
+        }
+        
+        // Connect button
+        connectBtn.addEventListener('click', () => {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const instanceId = document.getElementById('instanceIdInput').value;
+            const secretKey = document.getElementById('secretKey').value;
+            
+            if (!serverUrl || !instanceId || !secretKey) {
+                alert('Please fill in all configuration fields');
+                return;
+            }
+            
+            log('Connecting to server...', 'info');
+            
+            client = new ClaudePersistenceClient(serverUrl, instanceId, secretKey);
+            
+            // Register event handlers
+            client.on('connect', () => {
+                log('✓ Connected to persistence server', 'info');
+                updateStatus(true, instanceId);
+            });
+            
+            client.on('disconnect', (data) => {
+                log(`✗ Disconnected: ${data.reason}`, 'warn');
+                updateStatus(false);
+            });
+            
+            client.on('error', (data) => {
+                log(`✗ Connection error (attempt ${data.attempts})`, 'error');
+                updateStatus(false, instanceId, 0, data.attempts);
+            });
+            
+            client.on('registered', (data) => {
+                log(`✓ Instance registered: ${data.session_id}`, 'info');
+                log(`Active sessions: ${data.active_sessions}`, 'info');
+                updateStatus(true, instanceId, data.active_sessions);
+            });
+            
+            client.on('memory_synced', (data) => {
+                log('✓ Memory synchronized', 'info');
+            });
+            
+            client.on('instance_connected', (data) => {
+                log(`→ Another instance connected: ${data.session_id}`, 'info');
+            });
+            
+            client.on('instance_disconnected', (data) => {
+                log(`← Instance disconnected: ${data.instance_id}`, 'warn');
+            });
+            
+            client.on('custom_event', (data) => {
+                log(`📨 Custom event: ${data.event_type}`, 'info');
+                log(`   Data: ${JSON.stringify(data.data)}`, 'info');
+            });
+        });
+        
+        // Disconnect button
+        disconnectBtn.addEventListener('click', () => {
+            if (client) {
+                client.disconnect();
+                log('Disconnected by user', 'warn');
+                updateStatus(false);
+            }
+        });
+        
+        // Sync memory button
+        syncBtn.addEventListener('click', () => {
+            const memoryDataText = document.getElementById('memoryData').value;
+            
+            try {
+                const memoryData = JSON.parse(memoryDataText || '{}');
+                client.syncMemory(memoryData);
+                log('Memory sync requested', 'info');
+            } catch (error) {
+                log(`Error parsing memory data: ${error.message}`, 'error');
+            }
+        });
+        
+        // Send event button
+        sendEventBtn.addEventListener('click', () => {
+            const eventType = document.getElementById('eventType').value;
+            const eventDataText = document.getElementById('eventData').value;
+            
+            if (!eventType) {
+                alert('Please enter an event type');
+                return;
+            }
+            
+            try {
+                const eventData = JSON.parse(eventDataText || '{}');
+                client.sendEvent(eventType, eventData);
+                log(`Event sent: ${eventType}`, 'info');
+            } catch (error) {
+                log(`Error parsing event data: ${error.message}`, 'error');
+            }
+        });
+        
+        // Get active instances button
+        getInstancesBtn.addEventListener('click', () => {
+            client.getActiveInstances();
+            log('Requesting active instances...', 'info');
+            
+            // Listen for response
+            client.on('active_instances', (data) => {
+                log(`Active instances: ${data.count}`, 'info');
+                updateStatus(true, client.instanceId, data.count);
+            });
+        });
+        
+        // Initialize
+        log('Layer 3 test interface ready', 'info');
+    </script>
+</body>
+</html>
